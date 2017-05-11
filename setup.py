@@ -32,5 +32,7 @@ setup(
     install_requires=[
         'keyring>=10',
         'requests>=2',
+        'BeautifulSoup4>=4.6.0',
+        'yaml>=3.12',
     ]
 )
