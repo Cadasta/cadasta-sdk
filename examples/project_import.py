@@ -88,8 +88,7 @@ USERNAME = '' or os.environ.get('user')
 # Create a session that logs us into the Cadasta API. On first run, the session
 # will prompt the user for their password. Once submitted, this password will
 # be stored securely in the system's encrypted keychain.
-CNXN = connection.CadastaSession(CADASTA_URL, username=USERNAME)
-
+cnxn = connection.CadastaSession(CADASTA_URL, username=USERNAME)
 
 # Worker Functions:
 # Each of the following functions are designed to be processed by
@@ -102,8 +101,8 @@ def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
 
     original_file = resource_path.split('/')[-1]  # Filename with extension
     name = original_file.split('.')[0]  # Filename without extension
-    file_url = CNXN.upload_file(resource_path)
-    resource = CNXN.post(endpoint_url, json={
+    file_url = cnxn.upload_file(resource_path)
+    resource = cnxn.post(endpoint_url, json={
         'name': name,
         'file': file_url,
         'original_file': original_file
@@ -123,7 +122,7 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
     party_data = {
         'name': party_name,
     }
-    party = CNXN.post(url, json=party_data).json()
+    party = cnxn.post(url, json=party_data).json()
     party_id = party['id']
     logger.info("Created Party %r (%s/%s/%s)",
                 party_name, org_slug, proj_slug, party_id)
@@ -150,14 +149,14 @@ def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
 
     # Check that project does not already exist
     proj_url = endpoints.projects(org_slug, proj_slug)
-    if CNXN.head(proj_url):
+    if cnxn.head(proj_url):
         logger.info("Project %r (%s/%s) exists, not creating",
                     proj_name, org_slug, proj_slug)
     else:
         # Create project
         url = endpoints.projects(org_slug)
         proj_data = {'name': proj_name}
-        proj = CNXN.post(url, json=proj_data).json()
+        proj = cnxn.post(url, json=proj_data).json()
         logger.info("Created Project %r (%s/%s)",
                     proj_name, org_slug, proj_slug)
         proj_slug = proj['slug']
