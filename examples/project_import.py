@@ -1,7 +1,11 @@
 """
+Data Uploader
+=============
+
 This script is designed for uploading a directory of nested directories and
 files. This example is designed to work with a directory structure as such:
 
+```
 - {ProjectName_1}/
     - {PartyName_1}/
         - GDB/
@@ -20,7 +24,46 @@ files. This example is designed to work with a directory structure as such:
     - {PartyName_N}/
 - ...
 - {ProjectName_N}/
+```
 
+Overview
+---------
+The general workflow will be for this script to look through folders and files
+in the provided data directory. As those items are found, a task will be placed
+into a queue. We will have a collection of worker threads running that
+will be watching the queue, waiting for new tasks to perform (this is all
+managed by the `threading.ThreadQueue` helper). This way, we will be able to
+upload resources and records concurrently (i.e. many at once).
+
+Worker Functions
+--------------
+Worker functions are functions designed to be processed by our worker threads.
+Rather than directly calling a worker function to run (e.g.
+`create_project(foo, bar, abc=123)`), we place that function and its arguments
+into the queue (e.g. `q.put(create_project, foo, bar, abc=123)`). A worker
+worker function is always passed the `threading.ThreadQueue` queue instance as
+its first argument, along with the other arguments that were placed in the
+queue alongside the worker function. By passing the queue into the worker
+function, we ensure that workers always have the queue if they need to schedule
+future work to be processed.
+
+For example, in this example script we will create a Project from a directory's
+name. Within that Project directory is many Party directories. Rather than have
+one function create the many Party instances syncronously, we'll schedule
+`create_party` tasks, each with arguments representing a single Party
+directory. This allows the Thread Workers to create many Party instances at
+once.
+
+Be forwarned, it's difficult to gaurantee the order in which asyncronous
+operations are executed (https://twitter.com/iamdevloper/status/690170694106087424).
+For that reason, if you want to do something that is order-dependent, you
+should not schedule the second steps until you know the first step has
+completed. For example, if we want to upload a Location and also upload a
+Location Resource related to that Location, we could schedule the
+`create_location_resource` tasks as a last step in the `create_location`
+worker function. This becomes more difficult if an operation requires multiple
+prior operations, however this can be handled with some careful consideration
+about when to schedule followup tasks.
 """
 import logging
 import os
@@ -32,13 +75,13 @@ logger = logging.getLogger(__name__)
 
 
 # Location of directory of data
-DATA_DIR = '/Users/alukach/Downloads/example-data'
+DATA_DIR = ''
 # URL of Cadasta system
-CADASTA_URL = 'http://localhost:8000/'
+CADASTA_URL = 'https://...'
 # Slug of Organization to receive the data
-ORG_SLUG = 'kesan-oliver-test'
+ORG_SLUG = ''
 # Username of account to login as
-USERNAME = 'alukach'
+USERNAME = ''
 
 # Create a session that logs us into the Cadasta API. On first run, the session
 # will prompt the user for their password. Once submitted, this password will
