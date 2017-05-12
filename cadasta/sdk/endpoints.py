@@ -1,6 +1,3 @@
-from functools import partial as _partial
-
-
 def join_url(*fragments):
     url = '/'.join(f.strip('/') for f in fragments if f)
     if not url.startswith('http'):
@@ -20,81 +17,74 @@ S3_UPLOAD = '/s3/signed-url/'
 
 
 # Resources
-def orgs(org=None):
+def orgs(org_slug=None):
     """
-    /api/v1/organizations/{org}/
+    /api/v1/organizations/{org_slug}/
     """
-    return join_url(_V1_API_ROOT, 'organizations', org)
+    return join_url(_V1_API_ROOT, 'organizations', org_slug)
 
 
-def projects(org, proj=None):
+def projects(org_slug, proj_slug=None):
     """
-    /api/v1/organizations/{org}/projects/{proj}/
+    /api/v1/organizations/{org_slug}/projects/{proj_slug}/
     """
-    return join_url(orgs(org), 'projects', proj)
+    return join_url(orgs(org_slug), 'projects', proj_slug)
 
 
-def parties(org, proj, party=None):
+def parties(org_slug, proj_slug, party_id=None):
     """
-    /api/v1/organizations/{org}/projects/{proj}/parties/{party}/
+    /api/v1/organizations/{org_slug}/projects/{proj_slug}/parties/{party_id}/
     """
-    return join_url(projects(org, proj), 'parties', party)
+    return join_url(projects(org_slug, proj_slug), 'parties', party_id)
 
 
-def party_relationships(org, proj, party):
+def party_relationships(org_slug, proj_slug, party_id):
     """
-    /api/v1/organizations/{org}/projects/{proj}/parties/{slug}/relationships/
+    /api/v1/organizations/{org_slug}/projects/{proj_slug}/parties/{party_id}/relationships/
     """
-    return join_url(parties(org, proj, party), 'relationships')
+    return join_url(parties(org_slug, proj_slug, party_id), 'relationships')
 
 
-def party_resources(org, proj, party, resource_id):
+def party_resources(org_slug, proj_slug, party_id, resource_id=None):
     """
-    /api/v1/organizations/{org}/projects/{proj}/parties/{party}/resources/{resource_id}/
+    /api/v1/organizations/{org_slug}/projects/{proj_slug}/parties/{party_id}/resources/{resource_id}/
     """
-    return join_url(parties(org, proj, party), 'resources', resource_id)
+    return join_url(parties(org_slug, proj_slug, party_id), 'resources', resource_id)
 
 
-def questionnaire(org, proj):
+def questionnaire(org_slug, proj_slug):
     """
-    /api/v1/organizations/{org}/projects/{proj}/questionnaire/
+    /api/v1/organizations/{org_slug}/projects/{proj_slug}/questionnaire/
     """
-    return join_url(projects(org, proj), 'questionnaire')
+    return join_url(projects(org_slug, proj_slug), 'questionnaire')
 
 
-def party_relationships(org, proj, party_rel_id=None):
-    """
-    /api/v1/organizations/<organization>/projects/<project>/relationships/party/{party_rel_id}
-    """
-    return join_url(projects(org, proj), 'relationships', 'party', party_rel_id)
-
-
-def spatial_relationships(org, proj, spatial_rel_id=None):
+def spatial_relationships(org_slug, proj_slug, spatial_rel_id=None):
     """
     /api/v1/organizations/<organization>/projects/<project>/relationships/spatial/{spatial_rel_id}
     """
-    return join_url(projects(org, proj), 'relationships', 'spatial', spatial_rel_id)
+    return join_url(projects(org_slug, proj_slug), 'relationships', 'spatial', spatial_rel_id)
 
 
-def tenure_relationships(org, proj, tenure_rel_id=None):
+def tenure_relationships(org_slug, proj_slug, tenure_rel_id=None):
     """
     /api/v1/organizations/<organization>/projects/<project>/relationships/tenure/{tenure_rel_id}
     """
-    return join_url(projects(org, proj), 'relationships', 'tenure', tenure_rel_id)
+    return join_url(projects(org_slug, proj_slug), 'relationships', 'tenure', tenure_rel_id)
 
 
-def resources(org, proj, resource_id=None):
+def resources(org_slug, proj_slug, resource_id=None):
     """
     /api/v1/organizations/<organization>/projects/<project>/resource_ids/{resource}
     """
-    return join_url(projects(org, proj), 'resources', resource_id)
+    return join_url(projects(org_slug, proj_slug), 'resources', resource_id)
 
 
-def locations(org, proj, location_id=None):
+def locations(org_slug, proj_slug, location_id=None):
     """
     /api/v1/organizations/<organization>/projects/<project>/spatial/{location_id}
     """
-    return join_url(projects(org, proj), 'spatial', location_id)
+    return join_url(projects(org_slug, proj_slug), 'spatial', location_id)
 
 # TODO:
 # /api/v1/organizations/<organization>/projects/<project>/spatial/<location>/relationships/
