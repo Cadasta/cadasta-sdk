@@ -114,10 +114,10 @@ class CadastaSession(requests.Session):
         raise_for_status can be overridden at method call.
         """
         @wraps(func)
-        def wrapper(endpoint, raise_for_status=raise_for_status, *args, **kwargs):
+        def wrapper(endpoint, raise_for_status=raise_for_status, *args, **kw):
             if not endpoint.startswith('http'):
                 endpoint = self.expand_endpoint_url(endpoint)
-            resp = func(endpoint, *args, **kwargs)
+            resp = func(endpoint, *args, **kw)
             if raise_for_status:
                 try:
                     resp.raise_for_status()
@@ -131,25 +131,39 @@ class CadastaSession(requests.Session):
         """
         Retrieve CSRF for non-API endpoints
         """
-        from bs4 import BeautifulSoup
-        homepage = self.get(self.BASE_URL).text
-        soup = BeautifulSoup(homepage, 'html.parser')
-        return soup.input.attrs['value']
+        if not self.cookies.get('csrftoken'):
+            self.get(self.expand_endpoint_url('/dashboard'))
+        return self.cookies['csrftoken']
 
     def upload_file(self, file_path):
         policy = self.post(
             S3_UPLOAD,
-            data={
-                'key': file_path.split('/')[-1],
-                'csrfmiddlewaretoken': self.get_csrf()
+            data={'key': file_path.split('/')[-1]},
+            headers={
+                'Referer': self.BASE_URL,
+                'X-CSRFToken': self.get_csrf(),
+                'content-type': 'application/x-www-form-urlencoded',
             },
-            headers={'Referer': self.BASE_URL},
         ).json()
-        requests.post(
+        # When the Cadasta platform is running in 'dev' mode, Django-Buckets
+        # returns a policy['url'] in a relative form ('/media/s3/uploads').
+        # This should be fixed on the Django-Buckets library, however in the
+        # meantime this is a workaround:
+        if policy['url'].startswith('/'):
+            requests = self
+            policy['url'] += '?'
+        resp = requests.post(
             policy['url'],
-            data=policy['fields'],
+            json=policy['fields'],
             files={'file': open(file_path, 'rb')},
-        ).raise_for_status()
+            headers={
+                'X-CSRFToken': self.get_csrf(),
+                'Referer': self.BASE_URL
+            } if self == requests else {}  # Django-buckets CSRF work-around # noqa
+        )
+        if not resp.ok:
+            logging.error("RESPONSE: {}".format(resp.text))
+            resp.raise_for_status()
         return join_url(policy['url'], policy['fields']['key'])
 
     def describe_field_requirements(self, endpoint, verb='POST'):
@@ -175,4 +189,5 @@ class CadastaSession(requests.Session):
         )
         for name, data in fields:
             if data:
-                print(yaml.safe_dump({name.upper(): data}, default_flow_style=False))
+                print(yaml.safe_dump(
+                    {name.upper(): data}, default_flow_style=False))
