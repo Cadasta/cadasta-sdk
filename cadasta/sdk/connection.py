@@ -35,7 +35,7 @@ class CadastaSession(requests.Session):
                 Defaults to None.
             token_keyword (str, optional): Keyword used before token in
                 Authorization header.
-            raise_for_status - Throw exception on non-200 API responses
+            raise_for_status - Throw exception on 400+ level API responses
         """
         super(CadastaSession, self).__init__()
 
@@ -150,21 +150,29 @@ class CadastaSession(requests.Session):
             data=policy['fields'],
             files={'file': open(file_path, 'rb')},
         ).raise_for_status()
-        return join_url(policy['url'], policy['fields']['key']).rstrip('/')
+        return join_url(policy['url'], policy['fields']['key'])
 
-    def get_field_requirements(self, endpoint, verb='POST'):
+    def describe_field_requirements(self, endpoint, verb='POST'):
+        """ Print field information required for POSTing data """
         resp = self.options(endpoint).json()
-        assert 'actions' in resp, "No actions defined by API."
+        assert 'actions' in resp, ("No actions defined by API. "
+                                   "Likely a read-only endpoint.")
         required = []
         optional = []
         read_only = []
         for field, metadata in resp['actions'][verb].items():
+            f = {field: metadata}
             if metadata['required']:
-                required.append({field:metadata})
-                continue
-            if metadata['read_only']:
-                continue
-            optional.append({field:metadata})
-        for name, data in (('required', required), ('optional', optional)):
+                required.append(f)
+            elif metadata['read_only']:
+                read_only.append(f)
+            else:
+                optional.append(f)
+        fields = (
+            ('required', required),
+            ('optional', optional),
+            ('read_only', read_only)
+        )
+        for name, data in fields:
             if data:
                 print(yaml.safe_dump({name.upper(): data}, default_flow_style=False))
