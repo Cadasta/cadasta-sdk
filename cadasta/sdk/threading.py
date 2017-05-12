@@ -15,16 +15,16 @@ class Queue(queue.Queue, object):
 
 
 class ThreadQueue(object):
-    def __init__(self, thread_multiplier=2):
+    def __init__(self, cpu_multiplier=2):
         """
         Args:
-            thread_multiplier (int, optional): Number of threads per cpu. Set
+            cpu_multiplier (int, optional): Number of threads per cpu. Set
             to 0 for single-threaded operation. Thread-count maxes out at 8
             threads (to avoid overloading the Cadasta webserver).
         """
 
         self.q = Queue()
-        self.num_threads = min([(cpu_count() * thread_multiplier) or 1, 8])
+        self.num_threads = min([(cpu_count() * cpu_multiplier) or 1, 8])
         self.killswitch = threading.Event()
 
     def __enter__(self):

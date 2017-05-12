@@ -45,6 +45,7 @@ USERNAME = 'alukach'
 # be stored securely in the system's encrypted keychain.
 CNXN = connection.CadastaSession(CADASTA_URL, username=USERNAME)
 
+
 # Worker Functions:
 # Each of the following functions are designed to be processed by
 # thread-workers. They take in a Queue instance as their first argument and
@@ -93,7 +94,6 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
                 q.put(upload_party_resource, org_slug, proj_slug, party_id, path)
 
 
-
 def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
     """
     Given an Organization's slug, a project name, and path to a directory that
@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
     # Create worker threads and queue to process work concurrently. Worker
     # threads will begin watching the queue, waiting to process new tasks.
-    with threading.ThreadQueue(thread_multiplier=0) as q:
+    with threading.ThreadQueue() as q:
         # Each directory in the Project dir represents a Party
         for project_name in fs.ls_dirs(DATA_DIR):
             proj_dir = os.path.join(DATA_DIR, project_name)
