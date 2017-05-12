@@ -2,14 +2,15 @@ from __future__ import absolute_import
 
 from multiprocessing import cpu_count
 import threading
-import queue
 import logging
+
+from six import moves
 
 
 logger = logging.getLogger(__name__)
 
 
-class Queue(queue.Queue, object):
+class Queue(moves.queue.Queue, object):
     def put(self, func, *args, **kwargs):
         return super(Queue, self).put((func, args, kwargs))
 
@@ -60,7 +61,7 @@ class ThreadQueue(object):
                         ', '.join('{}={}'.format(k, repr(v)) for k, v in kwargs.items())
                     ] if x]))
                 logger.debug("Processing %s", signature_str)
-            except queue.Empty:
+            except moves.queue.Empty:
                 continue
             try:
                 func(self.q, *args, **kwargs)
