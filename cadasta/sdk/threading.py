@@ -16,8 +16,15 @@ class Queue(queue.Queue, object):
 
 class ThreadQueue(object):
     def __init__(self, thread_multiplier=2):
+        """
+        Args:
+            thread_multiplier (int, optional): Number of threads per cpu. Set
+            to 0 for single-threaded operation. Thread-count maxes out at 8
+            threads (to avoid overloading the Cadasta webserver).
+        """
+
         self.q = Queue()
-        self.num_threads = (cpu_count() * thread_multiplier) or 1
+        self.num_threads = min([(cpu_count() * thread_multiplier) or 1, 8])
         self.killswitch = threading.Event()
 
     def __enter__(self):
@@ -30,6 +37,7 @@ class ThreadQueue(object):
         return self.q
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self.q.join()
         self.killswitch.set()
         logger.debug("Exiting ThreadQueue context")
 
@@ -45,15 +53,19 @@ class ThreadQueue(object):
         while not self.killswitch.is_set():
             try:
                 func, args, kwargs = self.q.get(timeout=1)
-                logger.debug(
-                    "Processing %s(%s)", func.func_name,
-                    ','.join([x for x in [
-                        ','.join(args),
-                        ','.join('{}={}'.format(k, v) for k, v in kwargs.items())
-                    ] if x])
-                )
+                signature_str = "{}({})".format(
+                    func.__name__,
+                    ', '.join([x for x in [
+                        ', '.join([repr(arg) for arg in args]),
+                        ', '.join('{}={}'.format(k, repr(v)) for k, v in kwargs.items())
+                    ] if x]))
+                logger.debug("Processing %s", signature_str)
             except queue.Empty:
                 continue
-            func(self.q, *args, **kwargs)
-            self.q.task_done()
+            try:
+                func(self.q, *args, **kwargs)
+            except Exception:
+                logger.exception("Failed to process %s", signature_str)
+            finally:
+                self.q.task_done()
         logger.debug("Stopping thread {}".format(name))
