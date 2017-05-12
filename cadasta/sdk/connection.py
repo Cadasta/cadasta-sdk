@@ -136,17 +136,18 @@ class CadastaSession(requests.Session):
         return self.cookies['csrftoken']
 
     def upload_file(self, file_path):
-        policy = self.post(
-            S3_UPLOAD,
-            data={'key': file_path.split('/')[-1]},
-            headers={
+        headers = {
                 'Referer': self.BASE_URL,
                 'X-CSRFToken': self.get_csrf(),
                 'content-type': 'application/x-www-form-urlencoded',
-            },
+        }
+        policy = self.post(
+            S3_UPLOAD,
+            data={'key': file_path.split('/')[-1]},
+            headers=headers,
         ).json()
-        # When the Cadasta platform is running in 'dev' mode, Django-Buckets
-        # returns a policy['url'] in a relative form ('/media/s3/uploads').
+        # HACK: When the Cadasta platform is running in 'dev' mode,
+        # Django-Buckets returns a policy['url'] in a relative form ('/media/s3/uploads').
         # This should be fixed on the Django-Buckets library, however in the
         # meantime this is a workaround:
         if policy['url'].startswith('/'):
@@ -154,12 +155,10 @@ class CadastaSession(requests.Session):
             policy['url'] += '?'
         resp = requests.post(
             policy['url'],
+            data={'key': file_path.split('/')[-1]},  # TODO: Is this only needed for Django-Buckets?
             json=policy['fields'],
             files={'file': open(file_path, 'rb')},
-            headers={
-                'X-CSRFToken': self.get_csrf(),
-                'Referer': self.BASE_URL
-            } if self == requests else {}  # Django-buckets CSRF work-around # noqa
+            headers={k: v if k != 'content-type' else None for k, v in headers.items()} if self == requests else {}  # HACK: Django-buckets CSRF work-around # noqa
         )
         if not resp.ok:
             logging.error("RESPONSE: {}".format(resp.text))
