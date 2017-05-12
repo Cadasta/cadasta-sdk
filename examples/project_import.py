@@ -2,6 +2,9 @@
 Data Uploader
 =============
 
+Overview
+---------
+
 This script is designed for uploading a directory of nested directories and
 files. This example is designed to work with a directory structure as such:
 
@@ -26,17 +29,17 @@ files. This example is designed to work with a directory structure as such:
 - {ProjectName_N}/
 ```
 
-Overview
+Workflow
 ---------
-The general workflow will be for this script to look through folders and files
-in the provided data directory. As those items are found, a task will be placed
-into a queue. We will have a collection of worker threads running that
+The general workflow will be for this script to is look through folders and
+files in the provided data directory. As those items are found, a task will be
+placed into a queue. We will have a collection of worker threads running that
 will be watching the queue, waiting for new tasks to perform (this is all
 managed by the `threading.ThreadQueue` helper). This way, we will be able to
 upload resources and records concurrently (i.e. many at once).
 
 Worker Functions
---------------
+-----------------
 Worker functions are functions designed to be processed by our worker threads.
 Rather than directly calling a worker function to run (e.g.
 `create_project(foo, bar, abc=123)`), we place that function and its arguments
@@ -73,15 +76,14 @@ from cadasta.sdk import connection, endpoints, fs, utils, threading
 
 logger = logging.getLogger(__name__)
 
-
 # Location of directory of data
-DATA_DIR = ''
+DATA_DIR = '' or os.environ.get('dir')
 # URL of Cadasta system
-CADASTA_URL = 'https://...'
+CADASTA_URL = '' or os.environ.get('url')
 # Slug of Organization to receive the data
-ORG_SLUG = ''
+ORG_SLUG = '' or os.environ.get('org')
 # Username of account to login as
-USERNAME = ''
+USERNAME = '' or os.environ.get('user')
 
 # Create a session that logs us into the Cadasta API. On first run, the session
 # will prompt the user for their password. Once submitted, this password will
@@ -168,12 +170,13 @@ def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
 
 
 if __name__ == '__main__':
-    # Set up some loggers to write to file and console
+    # Set up some logger to write to file
     fmt = '%(asctime)s %(name)-12s: %(levelname)-8s %(threadName)s %(message)s'
     logging.basicConfig(level=logging.DEBUG,
                         format=fmt,
                         filename='./log',
                         filemode='a')
+    # Set up some logger to write console
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     formatter = logging.Formatter(fmt)
