@@ -1,5 +1,6 @@
 import getpass
 import logging
+import time
 
 from six import wraps, moves
 import keyring as keyringlib
@@ -46,7 +47,7 @@ class CadastaSession(requests.Session):
                     'localhost' not in base_url), (
                     "Connections must use HTTPS (unless using localhost)")
 
-        self.BASE_URL = base_url
+        self.BASE_URL = base_url.rstrip('/') + '/'
 
         # Add convenience of only requiring endpoints
         self.get = self._process_req_resp(self.get, raise_for_status)
@@ -62,6 +63,10 @@ class CadastaSession(requests.Session):
         token_header = '{} {}'.format(token_keyword, self.token)
         self.headers['Authorization'] = token_header
         self.headers['content-type'] = 'application/json'
+
+        # Flag to prevent multiple concurrent CSRF token requests in
+        # multi-threaded situations
+        self.__fetching_csrf = False
 
     def __repr__(self):
         return '<{}>'.format(self.BASE_URL)
@@ -129,10 +134,27 @@ class CadastaSession(requests.Session):
 
     def get_csrf(self):
         """
-        Retrieve CSRF for non-API endpoints
+        Retrieve CSRF for non-API endpoints. This code sets an internal
+        lock to prevent multiple simultaneous CSRF token requests. If
+        method is called while lock is set (likely by a separate thread),
+        block until CSRF token is set on session or 5 seconds have passed.
         """
         if not self.cookies.get('csrftoken'):
-            self.get(self.expand_endpoint_url('/dashboard'))
+            if not self.__fetching_csrf:
+                self.__fetching_csrf = True
+                try:
+                    self.get(self.expand_endpoint_url('/dashboard'))
+                except:
+                    self.__fetching_csrf = False
+                    raise
+            else:
+                start = time.time()
+                while not self.cookies.get('csrftoken'):
+                    assert (time.time() - start) < 5, \
+                        "No CSRF token found after waiting 5 seconds."
+                    time.sleep(.1)
+
+        assert self.cookies.get('csrftoken'), "No CSRF token found in cookie"
         return self.cookies['csrftoken']
 
     def upload_file(self, file_path):
@@ -152,13 +174,16 @@ class CadastaSession(requests.Session):
         # meantime this is a workaround:
         if policy['url'].startswith('/'):
             requests = self
-            policy['url'] += '?'
+            policy['url'] = (self.BASE_URL.rstrip('/') + policy['url'])
+        print(policy)
         resp = requests.post(
             policy['url'],
-            data={'key': file_path.split('/')[-1]},  # TODO: Is this only needed for Django-Buckets?
+            data={'key': policy['fields']['key']},  # TODO: Is this only needed for Django-Buckets?
             json=policy['fields'],
             files={'file': open(file_path, 'rb')},
-            headers={k: v if k != 'content-type' else None for k, v in headers.items()} if self == requests else {}  # HACK: Django-buckets CSRF work-around # noqa
+            headers={
+                k: v if k != 'content-type' else None for k, v in headers.items()
+            } if self == requests else {}  # HACK: Django-buckets CSRF work-around # noqa
         )
         if not resp.ok:
             logging.error("RESPONSE: {}".format(resp.text))
