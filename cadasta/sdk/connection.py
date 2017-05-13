@@ -47,7 +47,7 @@ class CadastaSession(requests.Session):
                     'localhost' not in base_url), (
                     "Connections must use HTTPS (unless using localhost)")
 
-        self.BASE_URL = base_url.rstrip('/') + '/'
+        self.BASE_URL = base_url.rstrip('/')
 
         # Add convenience of only requiring endpoints
         self.get = self._process_req_resp(self.get, raise_for_status)
@@ -157,28 +157,37 @@ class CadastaSession(requests.Session):
         assert self.cookies.get('csrftoken'), "No CSRF token found in cookie"
         return self.cookies['csrftoken']
 
-    def upload_file(self, file_path):
+    def upload_file(self, file_path, upload_to=None):
+        """ Upload file a provided path to S3. Returns URL of uploaded file """
         headers = {
                 'Referer': self.BASE_URL,
                 'X-CSRFToken': self.get_csrf(),
                 'content-type': 'application/x-www-form-urlencoded',
         }
+        key = file_path.split('/')[-1]
+        # HACK: If the model that will store this file has an `upload_to`
+        # property on its `S3FileField`, it's important that the key fit with
+        # this declaration so that the file may be opened by the system in the
+        # future (the platform assumes the file's key is prepended with the
+        # `upload_to` location)
+        if upload_to:
+            key = upload_to + '/' + key
         policy = self.post(
             S3_UPLOAD,
-            data={'key': file_path.split('/')[-1]},
+            data={'key': key},
             headers=headers,
         ).json()
+
         # HACK: When the Cadasta platform is running in 'dev' mode,
-        # Django-Buckets returns a policy['url'] in a relative form ('/media/s3/uploads').
-        # This should be fixed on the Django-Buckets library, however in the
-        # meantime this is a workaround:
+        # Django-Buckets returns a policy['url'] in a relative form
+        # ('/media/s3/uploads'). This should be fixed on the Django-Buckets
+        # library, however in the meantime this is a workaround:
         if policy['url'].startswith('/'):
             requests = self
-            policy['url'] = (self.BASE_URL.rstrip('/') + policy['url'])
-        print(policy)
+            policy['url'] = (self.BASE_URL + policy['url'])
         resp = requests.post(
             policy['url'],
-            data={'key': policy['fields']['key']},  # TODO: Is this only needed for Django-Buckets?
+            data={'key': policy['fields']['key']},  # TODO: Is this only needed for Django-Buckets dev mode? # noqa
             json=policy['fields'],
             files={'file': open(file_path, 'rb')},
             headers={

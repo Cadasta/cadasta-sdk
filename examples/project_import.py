@@ -57,7 +57,7 @@ one function create the many Party instances syncronously, we'll schedule
 directory. This allows the Thread Workers to create many Party instances at
 once.
 
-Be forwarned, it's difficult to gaurantee the order in which asyncronous
+Be forwarned, it's difficult to gaurantee the order in which asynchronous
 operations are executed (https://twitter.com/iamdevloper/status/690170694106087424).
 For that reason, if you want to do something that is order-dependent, you
 should not schedule the second steps until you know the first step has
@@ -69,6 +69,7 @@ prior operations, however this can be handled with some careful consideration
 about when to schedule followup tasks.
 """
 import logging
+import mimetypes
 import os
 
 from cadasta.sdk import connection, endpoints, fs, utils, threading
@@ -90,6 +91,7 @@ USERNAME = '' or os.environ.get('user')
 # be stored securely in the system's encrypted keychain.
 cnxn = connection.CadastaSession(CADASTA_URL, username=USERNAME)
 
+
 # Worker Functions:
 # Each of the following functions are designed to be processed by
 # thread-workers. They take in a Queue instance as their first argument and
@@ -98,27 +100,35 @@ cnxn = connection.CadastaSession(CADASTA_URL, username=USERNAME)
 # syncronously.
 def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
     endpoint_url = endpoints.party_resources(org_slug, proj_slug, party_id)
-
     original_file = resource_path.split('/')[-1]  # Filename with extension
     name = original_file.split('.')[0]  # Filename without extension
-    file_url = cnxn.upload_file(resource_path)
-    resource = cnxn.post(endpoint_url, json={
+    ext = original_file.split('.')[-1]
+
+    # Upload Resource file to S3
+    file_url = cnxn.upload_file(resource_path, upload_to='resources')  # HACK: The `upload_to` value must match what is used on the model in the Cadasta Platform codebase. No way to get this value via API. # noqa
+
+    # Create Resource
+    resource_data = {
         'name': name,
         'file': file_url,
-        'original_file': original_file
-    }).json()
+        'original_file': original_file,
+    }
+    mime_type = mimetypes.types_map.get('.' + ext.lower())
+    if mime_type:
+        resource_data.update(mime_type=mime_type)
+    resource = cnxn.post(endpoint_url, json=resource_data).json()
+
     resource_id = resource['id']
     resource_url = endpoints.party_resources(org_slug, proj_slug, party_id, resource_id)
-    logger.info("Uploaded resource %r", resource_url)
+    logger.info("Uploaded resource %r", cnxn.BASE_URL + resource_url)
 
 
 def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
-    party_slug = utils.slugify(party_name)
-
     # Unfortunately, because Parties have random IDs and no slug, we can't test
     # if they exist.
-    proj_url = endpoints.parties(org_slug, proj_slug, party_slug)
     url = endpoints.parties(org_slug, proj_slug)
+
+    # Create Party
     party_data = {
         'name': party_name,
     }
@@ -127,6 +137,7 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
     logger.info("Created Party %r (%s/%s/%s)",
                 party_name, org_slug, proj_slug, party_id)
 
+    # Crawl Party directory
     for d in fs.ls_dirs(party_dir):
         # We're handle the Party Resources and Locations here. We can't yet
         # handle the Location Resources or Relationship Resources as we haven't
@@ -135,7 +146,9 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
             photo_dir = os.path.join(party_dir, d)
             for f in fs.ls_files(photo_dir):
                 path = os.path.join(photo_dir, f)
-                q.put(upload_party_resource, org_slug, proj_slug, party_id, path)
+                # Schedule 'upload_party_resource' for each photo
+                q.put(upload_party_resource, org_slug, proj_slug,
+                      party_id, path)
 
 
 def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
@@ -147,13 +160,13 @@ def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
     """
     proj_slug = utils.slugify(proj_name)
 
-    # Check that project does not already exist
+    # Check that Project does not already exist
     proj_url = endpoints.projects(org_slug, proj_slug)
     if cnxn.head(proj_url):
         logger.info("Project %r (%s/%s) exists, not creating",
                     proj_name, org_slug, proj_slug)
     else:
-        # Create project
+        # Create Project
         url = endpoints.projects(org_slug)
         proj_data = {'name': proj_name}
         proj = cnxn.post(url, json=proj_data).json()
@@ -163,8 +176,8 @@ def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
 
     # Each directory in the Project dir represents a Party
     for party_name in fs.ls_dirs(proj_dir):
-        # Schedule 'create_party' for each directory
         party_dir = os.path.join(proj_dir, party_name)
+        # Schedule 'create_party' for each directory
         q.put(create_party, org_slug, proj_slug, party_name, party_dir)
 
 
