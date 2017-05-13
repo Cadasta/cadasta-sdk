@@ -200,7 +200,9 @@ class CadastaSession(requests.Session):
         return join_url(policy['url'], policy['fields']['key'])
 
     def describe_field_requirements(self, endpoint, verb='POST'):
-        """ Print field information required for POSTing data """
+        """
+        Print field information required for POSTing data
+        """
         resp = self.options(endpoint).json()
         assert 'actions' in resp, ("No actions defined by API. "
                                    "Likely a read-only endpoint.")

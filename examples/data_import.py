@@ -1,12 +1,13 @@
 """
-Data Uploader
-=============
+Dataset Importer
+=================
 
 Overview
 ---------
 
-This script is designed for uploading a directory of nested directories and
-files. This example is designed to work with a directory structure as such:
+This script is designed for importing large datasets that are stored in a
+directory of nested directories and files. This example is designed to work
+with a directory structure as such:
 
 ```
 - {ProjectName_1}/
@@ -70,10 +71,10 @@ about when to schedule followup tasks.
 """
 
 import logging
-import mimetypes
 import os
 
-from cadasta.sdk import connection, endpoints, fs, utils, threading
+from cadasta.sdk import connection, endpoints
+from cadasta.sdk.helpers import fs, http, string, threading
 
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,6 @@ def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
     endpoint_url = endpoints.party_resources(org_slug, proj_slug, party_id)
     original_file = resource_path.split('/')[-1]  # Filename with extension
     name = original_file.split('.')[0]  # Filename without extension
-    ext = original_file.split('.')[-1]
 
     # Upload Resource file to S3
     file_url = cnxn.upload_file(resource_path, upload_to='resources')  # HACK: The `upload_to` value must match what is used on the model in the Cadasta Platform codebase. No way to get this value via API. # noqa
@@ -114,7 +114,7 @@ def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
         'file': file_url,
         'original_file': original_file,
     }
-    mime_type = mimetypes.types_map.get('.' + ext.lower())
+    mime_type = http.get_mime_type(endpoint_url)
     if mime_type:
         resource_data.update(mime_type=mime_type)
     resource = cnxn.post(endpoint_url, json=resource_data).json()
@@ -155,7 +155,7 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
     for d in fs.ls_dirs(party_dir):
         # Making this case-insensitive lowers chance for error. Typos will
         # still be problematic. If there are many typos in your dataset,
-        # take a look at using utils.similarity().
+        # take a look at using string.similarity().
         name = d.lower()
         # We're handle the Party Resources and Locations here. We can't yet
         # handle the Location Resources or Relationship Resources as we haven't
@@ -179,7 +179,7 @@ def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
     does not already exist). After creating project, crawl project directory
     for directories and schedule tasks to create a Party for each directory.
     """
-    proj_slug = utils.slugify(proj_name)
+    proj_slug = string.slugify(proj_name)
 
     # Check that Project does not already exist
     proj_url = endpoints.projects(org_slug, proj_slug)
