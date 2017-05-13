@@ -18,7 +18,7 @@ files. This example is designed to work with a directory structure as such:
         - Map/
             - PDF files (Relationship Resources)
         - Photo/
-            - Image (JPEG, TIF, PNG) files (Party Resources)
+            - Image files (JPEG, TIF, PNG) (Party Resources)
         - Shp/
             - Shapefiles (Locations)
         - Text/
@@ -68,6 +68,7 @@ worker function. This becomes more difficult if an operation requires multiple
 prior operations, however this can be handled with some careful consideration
 about when to schedule followup tasks.
 """
+
 import logging
 import mimetypes
 import os
@@ -119,7 +120,8 @@ def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
     resource = cnxn.post(endpoint_url, json=resource_data).json()
 
     resource_id = resource['id']
-    resource_url = endpoints.party_resources(org_slug, proj_slug, party_id, resource_id)
+    resource_url = endpoints.party_resources(org_slug, proj_slug, party_id,
+                                             resource_id)
     logger.info("Uploaded resource %r", cnxn.BASE_URL + resource_url)
 
 
@@ -138,17 +140,36 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
                 party_name, org_slug, proj_slug, party_id)
 
     # Crawl Party directory
+    #   - GDB/
+    #       - GPX files (Location Resources)
+    #   - MXD/
+    #       - MXD files (Relationship Resources)
+    #   - Map/
+    #       - PDF files (Relationship Resources)
+    #   - Photo/
+    #       - Image files (JPEG, TIF, PNG) (Party Resources)
+    #   - Shp/
+    #       - Shapefiles (Locations)
+    #   - Text/
+    #       - DOC, DOCX, PDF, TIF files (Relationship Resources)
     for d in fs.ls_dirs(party_dir):
+        # Making this case-insensitive lowers chance for error. Typos will
+        # still be problematic. If there are many typos in your dataset,
+        # take a look at using utils.similarity().
+        name = d.lower()
         # We're handle the Party Resources and Locations here. We can't yet
         # handle the Location Resources or Relationship Resources as we haven't
         # yet uploaded the Locations.
-        if d.lower() in ('photo'):
+        if name in ('photo',):
             photo_dir = os.path.join(party_dir, d)
             for f in fs.ls_files(photo_dir):
                 path = os.path.join(photo_dir, f)
                 # Schedule 'upload_party_resource' for each photo
                 q.put(upload_party_resource, org_slug, proj_slug,
                       party_id, path)
+        if name in ('shp',):
+            # TODO
+            pass
 
 
 def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
