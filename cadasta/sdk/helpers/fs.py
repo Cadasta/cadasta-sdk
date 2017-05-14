@@ -35,5 +35,5 @@ def ls_files(path, hidden=None):
     """
     for f in ls(path, isfile=True):
         if (hidden is not None) and (f.startswith('.') != hidden):
-                continue
+            continue
         yield f

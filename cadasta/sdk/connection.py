@@ -191,7 +191,8 @@ class CadastaSession(requests.Session):
             json=policy['fields'],
             files={'file': open(file_path, 'rb')},
             headers={
-                k: v if k != 'content-type' else None for k, v in headers.items()
+                k: v if k != 'content-type' else None
+                for k, v in headers.items()
             } if self == requests else {}  # HACK: Django-buckets CSRF work-around # noqa
         )
         if not resp.ok:
