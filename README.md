@@ -1,6 +1,10 @@
 # Cadasta SDK
 
-This is an SDK for interacting with the [Cadasta Platform](https://cadasta.org) using Python.  It is written to support both Python 2.7+ and Python 3.
+This is an SDK for interacting with the [Cadasta Platform](http://cadasta.org) using Python.  It is written to support both Python 2.7+ and Python 3.
+
+## A Warning
+
+This codebase is very much in Alpha stage. At the moment of writing, there is little-to-no test coverage or versioning. This is still in an exporatory phase and the tooling may shift dramatically. An attempt will be made to update the example script as the codebase changes, however it can't be guaranteed. For an idea about where this codebase will be going, see the open [issues](../../issues).
 
 
 ## Getting Started
