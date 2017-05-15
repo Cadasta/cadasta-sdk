@@ -184,7 +184,7 @@ class CadastaSession(requests.Session):
         # library, however in the meantime this is a workaround:
         if policy['url'].startswith('/'):
             requests = self
-            policy['url'] = (self.BASE_URL + policy['url'])
+            policy['url'] = (self.BASE_URL + policy['url'])  # TODO: Rm after https://github.com/Cadasta/django-buckets/pull/22
         resp = requests.post(
             policy['url'],
             data={'key': policy['fields']['key']},  # TODO: Is this only needed for Django-Buckets dev mode? # noqa
@@ -193,7 +193,7 @@ class CadastaSession(requests.Session):
             headers={
                 k: v if k != 'content-type' else None
                 for k, v in headers.items()
-            } if self == requests else {}  # HACK: Django-buckets CSRF work-around # noqa
+            } if self == requests else {}  # HACK: Django-buckets CSRF work-around, rm after https://github.com/Cadasta/django-buckets/pull/24 # noqa
         )
         if not resp.ok:
             logging.error("RESPONSE: {}".format(resp.text))
