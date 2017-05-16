@@ -14,7 +14,7 @@ def ls(path, isfile=None):
         if (isfile is not None):
             if not os.path.isfile(os.path.join(path, file)) == isfile:
                 continue
-        yield file
+        yield os.path.join(path, file)
 
 
 def ls_dirs(path):
@@ -34,6 +34,6 @@ def ls_files(path, hidden=None):
         Defaults to None, showing both hidden and not-hidden.
     """
     for f in ls(path, isfile=True):
-        if (hidden is not None) and (f.startswith('.') != hidden):
+        if (hidden is not None) and (f.split('/')[-1].startswith('.') != hidden):
             continue
         yield f

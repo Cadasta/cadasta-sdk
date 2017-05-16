@@ -18,9 +18,9 @@ with a directory structure as such:
             - MXD files (Relationship Resources)
         - Map/
             - PDF files (Relationship Resources)
-        - Photo/
+        - ✔Photo/
             - Image files (JPEG, TIF, PNG) (Party Resources)
-        - Shp/
+        - ✔Shp/
             - Shapefiles (Locations)
         - Text/
             - DOC, DOCX, PDF, TIF files (Relationship Resources)
@@ -74,7 +74,7 @@ import logging
 import os
 
 from cadasta.sdk import connection, endpoints
-from cadasta.sdk.helpers import fs, http, string, threading
+from cadasta.sdk.helpers import fs, geo, http, string, threading
 
 
 logger = logging.getLogger(__name__)
@@ -100,6 +100,32 @@ cnxn = connection.CadastaSession(CADASTA_URL, username=USERNAME)
 # then whatever values are needed to get the job done. By sending work into the
 # queue, it allows our thread-workers to process them concurrently rather than
 # syncronously.
+def upload_location(q, org_slug, proj_slug, party_id, shp_path):
+    endpoint_url = endpoints.locations(org_slug, proj_slug)
+    relationships = []
+    for layer in geo.prepare_geodata(shp_path):
+        # TODO: Something is wrong here. Maybe we don't want every layer to be
+        # a SpatialUnit.
+        spatial_unit = cnxn.post(endpoint_url, json=layer).json()
+        su_id = spatial_unit['properties']['id']
+
+        # Add relationship between location and party
+        tenure_endpoint = endpoints.tenure_relationships(org_slug, proj_slug)
+        relationships.append(cnxn.post(tenure_endpoint, json={
+            'party': party_id,
+            'spatial_unit': su_id,
+            'tenure_type': 'LH',  # TODO: Verify that this is correct (https://cadasta.github.io/api-docs/#relationship-json-object)
+            'attributes': {},
+        }).json())
+
+    # TODO:
+    #   - Zip up SHP files, upload as Relationship Resource
+    #   - Process GDB/ data as Location Resources
+    #   - Process MXD/ data as Relationship Resources
+    #   - Process Map/ data as Relationship Resources
+    #   - Process Text/ data as Relationship Resources
+
+
 def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
     endpoint_url = endpoints.party_resources(org_slug, proj_slug, party_id)
     original_file = resource_path.split('/')[-1]  # Filename with extension
@@ -114,7 +140,7 @@ def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
         'file': file_url,
         'original_file': original_file,
     }
-    mime_type = http.get_mime_type(endpoint_url)
+    mime_type = http.get_mime_type(resource_path)
     if mime_type:
         resource_data.update(mime_type=mime_type)
     resource = cnxn.post(endpoint_url, json=resource_data).json()
@@ -125,12 +151,13 @@ def upload_party_resource(q, org_slug, proj_slug, party_id, resource_path):
     logger.info("Uploaded resource %r", cnxn.BASE_URL + resource_url)
 
 
-def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
+def create_party(q, org_slug, proj_slug, party_dir):
     # Unfortunately, because Parties have random IDs and no slug, we can't test
     # if they exist.
     url = endpoints.parties(org_slug, proj_slug)
 
     # Create Party
+    party_name = party_dir.split('/')[-1]
     party_data = {
         'name': party_name,
     }
@@ -156,29 +183,29 @@ def create_party(q, org_slug, proj_slug, party_name, party_dir, **kwargs):
         # Making this case-insensitive lowers chance for error. Typos will
         # still be problematic. If there are many typos in your dataset,
         # take a look at using string.similarity().
-        name = d.lower()
+        name = d.split('/')[-1].lower()
         # We're handle the Party Resources and Locations here. We can't yet
         # handle the Location Resources or Relationship Resources as we haven't
         # yet uploaded the Locations.
         if name in ('photo',):
-            photo_dir = os.path.join(party_dir, d)
-            for f in fs.ls_files(photo_dir):
-                path = os.path.join(photo_dir, f)
+            for path in fs.ls_files(d):
                 # Schedule 'upload_party_resource' for each photo
                 q.put(upload_party_resource, org_slug, proj_slug,
                       party_id, path)
         if name in ('shp',):
-            # TODO
-            pass
+            files = [f for f in fs.ls_files(d) if f.endswith('.shp')]
+            for path in files:
+                q.put(upload_location, org_slug, proj_slug, party_id, path)
 
 
-def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
+def create_project(q, org_slug, proj_dir, **kwarg):
     """
     Given an Organization's slug, a project name, and path to a directory that
     represents a Project, create a Project on Cadasta system (assuming that it
     does not already exist). After creating project, crawl project directory
     for directories and schedule tasks to create a Party for each directory.
     """
+    proj_name = proj_dir.split('/')[-1]
     proj_slug = string.slugify(proj_name)
 
     # Check that Project does not already exist
@@ -196,10 +223,9 @@ def create_project(q, org_slug, proj_name, proj_dir, **kwarg):
         proj_slug = proj['slug']
 
     # Each directory in the Project dir represents a Party
-    for party_name in fs.ls_dirs(proj_dir):
-        party_dir = os.path.join(proj_dir, party_name)
+    for party_dir in fs.ls_dirs(proj_dir):
         # Schedule 'create_party' for each directory
-        q.put(create_party, org_slug, proj_slug, party_name, party_dir)
+        q.put(create_party, org_slug, proj_slug, party_dir)
 
 
 if __name__ == '__main__':
@@ -220,6 +246,5 @@ if __name__ == '__main__':
     # threads will begin watching the queue, waiting to process new tasks.
     with threading.ThreadQueue() as q:
         # Each directory in the Project dir represents a Party
-        for project_name in fs.ls_dirs(DATA_DIR):
-            proj_dir = os.path.join(DATA_DIR, project_name)
-            q.put(create_project, ORG_SLUG, project_name, proj_dir)
+        for proj_dir in fs.ls_dirs(DATA_DIR):
+            q.put(create_project, ORG_SLUG, proj_dir)
