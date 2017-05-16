@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class CadastaSession(requests.Session):
 
-    def __init__(self, base_url='https://platform-staging.cadasta.org',
+    def __init__(self, base_url='https://platform.cadasta.org',
                  username=None, keyring=True, token=None,
                  token_keyword='token', raise_for_status=True):
         """
@@ -24,7 +24,7 @@ class CadastaSession(requests.Session):
         Args:
             base_url (str, optional): Root URL of site with protocol. eg.
             'http://localhost', 'https://demo.cadasta.org'. Defaults to
-            'https://platform-staging-api.cadasta.org'
+            'https://staging.cadasta.org'
             username (str, optional): Username of Cadasta account. If not
                 provided, a user-prompt will occur at runtime requesting the
                 username. Defaults to None.
@@ -87,9 +87,12 @@ class CadastaSession(requests.Session):
             resp.raise_for_status()
         except:
             if keyring:
-                keyringlib.delete_password(self.BASE_URL, username)
+                self.flush_keyring(username)
             raise
         return resp.json()['auth_token']
+
+    def flush_keyring(self, username):
+        return keyringlib.delete_password(self.BASE_URL, username)
 
     def _get_username(self):
         """ Retrieve username from user input """
