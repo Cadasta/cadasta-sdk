@@ -190,8 +190,7 @@ class CadastaSession(requests.Session):
             policy['url'] = (self.BASE_URL + policy['url'])  # TODO: Rm after https://github.com/Cadasta/django-buckets/pull/22
         resp = requests.post(
             policy['url'],
-            data={'key': policy['fields']['key']},  # TODO: Is this only needed for Django-Buckets dev mode? # noqa
-            json=policy['fields'],
+            data=policy['fields'],
             files={'file': open(file_path, 'rb')},
             headers={
                 k: v if k != 'content-type' else None
