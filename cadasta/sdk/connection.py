@@ -77,7 +77,7 @@ class CadastaSession(requests.Session):
 
     def login(self, username=None, keyring=True):
         """ Login to session """
-        username = username or self._get_username()
+        username = (username or self._get_username()).lower()
         password = self._get_password(username, keyring)
         try:
             resp = self.post(
@@ -184,6 +184,7 @@ class CadastaSession(requests.Session):
         # Django-Buckets returns a policy['url'] in a relative form
         # ('/media/s3/uploads'). This should be fixed on the Django-Buckets
         # library, however in the meantime this is a workaround:
+        global requests
         if policy['url'].startswith('/'):
             requests = self
             policy['url'] = (self.BASE_URL + policy['url'])  # TODO: Rm after https://github.com/Cadasta/django-buckets/pull/22
