@@ -1,4 +1,6 @@
+from tempfile import mkdtemp
 import os
+import shutil
 
 
 def ls(path, isfile=None):
@@ -37,3 +39,26 @@ def ls_files(path, hidden=None):
         if (hidden is not None) and (f.split('/')[-1].startswith('.') != hidden):
             continue
         yield f
+
+
+class TemporaryDirectory(object):
+    """
+    Create and return a temporary directory.  This has the same behavior as
+    mkdtemp but can be used as a context manager.  For example:
+
+        with TemporaryDirectory() as tmpdir:
+            ...
+
+    Upon exiting the context, the directory and everything contained
+    in it are removed.
+    """
+
+    def __init__(self, suffix="", prefix="tmp", dir=None):
+        self._closed = False
+        self.path = mkdtemp(suffix, prefix, dir)
+
+    def __enter__(self):
+        return self.path
+
+    def __exit__(self, exc, value, tb):
+        shutil.rmtree(self.path)
