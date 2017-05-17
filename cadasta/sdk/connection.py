@@ -79,12 +79,11 @@ class CadastaSession(requests.Session):
         """ Login to session """
         username = username or self._get_username()
         password = self._get_password(username, keyring)
-        resp = self.post(
-            LOGIN,
-            data={'username': username, 'password': password}
-        )
         try:
-            resp.raise_for_status()
+            resp = self.post(
+                LOGIN,
+                data={'username': username, 'password': password}
+            )
         except:
             if keyring:
                 self.flush_keyring(username)
