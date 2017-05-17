@@ -58,7 +58,7 @@ class ThreadQueue(object):
                     func.__name__,
                     ', '.join([x for x in [
                         ', '.join([repr(arg) for arg in args]),
-                        ', '.join('{}={}'.format(k, repr(v)) for k, v in kwargs.items())
+                        ', '.join('{}={!r}'.format(*i) for i in kwargs.items())
                     ] if x]))
                 logger.debug("Processing %s", signature_str)
             except moves.queue.Empty:
