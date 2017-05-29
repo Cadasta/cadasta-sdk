@@ -15,13 +15,13 @@ def transform_layer(layer, epsg=4326):
     return layer
 
 
-def prepare_geodata(path):
+def prepare_geodata(path, default_epsg=None):
     """
     Given a path to an OGR-compatible spatial file, open file, convert to
     EPSG:4326, round to 6 decimal places (11mm precision), and yield GeoJSON
     Features from that file.
     """
     with fiona.open(path) as data:
-        epsg = data.crs['init'].split(':')[-1]
+        epsg = data.crs.get('init', str(default_epsg)).split(':')[-1]
         for layer in data:
             yield transform_layer(layer, epsg=epsg)
