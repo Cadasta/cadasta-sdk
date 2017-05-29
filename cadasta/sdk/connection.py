@@ -121,7 +121,7 @@ class CadastaSession(requests.Session):
         raise_for_status can be overridden at method call.
         """
         @wraps(func)
-        def wrapper(endpoint, raise_for_status=raise_for_status, *args, **kw):
+        def wrapper(endpoint, raise_for_status=raise_for_status, follow_pagination=False, *args, **kw):
             if not endpoint.startswith('http'):
                 endpoint = self.expand_endpoint_url(endpoint)
             resp = func(endpoint, *args, **kw)
@@ -131,8 +131,29 @@ class CadastaSession(requests.Session):
                 except:
                     logging.error("RESPONSE: {}".format(resp.text))
                     raise
+            if follow_pagination:
+                return self.follow_pagination(resp.json())
             return resp
         return wrapper
+
+    def follow_pagination(self, data):
+        """
+        Follow standard paginated response. WARNING: Does not work for
+        paginated GeoJSON response.
+        """
+        assert isinstance(data, dict), (
+            "Malformed response payload. Expected 'dict', got "
+            "{!r}".format(type(data)))
+        assert 'next' in data, (
+            "Malformed response payload. Missing 'next' key.")
+        assert 'results' in data, (
+            "Malformed response payload. Missing 'result' key.")
+        while True:
+            for r in data['results']:
+                yield r
+            if not data['next']:
+                break
+            data = self.get(data['next']).json()
 
     def get_csrf(self):
         """
