@@ -86,11 +86,16 @@ def locations(org_slug, proj_slug, location_id=None):
     """
     return join_url(projects(org_slug, proj_slug), 'spatial', location_id)
 
+def location_resources(org_slug, proj_slug, location_id, resource_id=None):
+    """
+    /api/v1/organizations/{org_slug}/projects/{proj_slug}/parties/{party_id}/resources/{resource_id}/
+    """
+    return join_url(locations(org_slug, proj_slug, location_id), 'resources', resource_id)
+
 # TODO:
 # /api/v1/organizations/<organization>/projects/<project>/spatial/<location>/relationships/
 # /api/v1/organizations/<organization>/projects/<project>/spatial/<location>/resources/
 # /api/v1/organizations/<organization>/projects/<project>/spatial/<location>/resources/<resource>/
-# /api/v1/organizations/<organization>/projects/<project>/spatialresources/
-# /api/v1/organizations/<organization>/projects/<project>/spatialresources/<resource>/
+# /api/v1/organizations/<organization>/projects/<project>/spatial/resources/<resource>/
 # /api/v1/organizations/<organization>/projects/<project>/users/
 # /api/v1/organizations/<organization>/projects/<project>/users/<username>/
